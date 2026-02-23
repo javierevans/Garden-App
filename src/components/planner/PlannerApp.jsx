@@ -1,12 +1,44 @@
 import { useMemo, useState, useEffect } from "react";
-import { loadGardenState, saveGardenState } from "../../utils/gardenStorage";
+import {
+  loadGardenState,
+  saveGardenState,
+  getCurrentGardenDay,
+} from "../../utils/gardenStorage";
 
 /* ===== Built-in plant library (base) ===== */
 const PLANTS = [
-  { id: "tomato", type: "Tomato", variety: null, name: "Tomato", emoji: "🍅", image: null },
-  { id: "pepper", type: "Pepper", variety: null, name: "Pepper", emoji: "🫑", image: null },
-  { id: "carrot", type: "Carrot", variety: null, name: "Carrot", emoji: "🥕", image: null },
-  { id: "lettuce", type: "Lettuce", variety: null, name: "Lettuce", emoji: "🥬", image: null },
+  {
+    id: "tomato",
+    type: "Tomato",
+    variety: null,
+    name: "Tomato",
+    emoji: "🍅",
+    image: null,
+  },
+  {
+    id: "pepper",
+    type: "Pepper",
+    variety: null,
+    name: "Pepper",
+    emoji: "🫑",
+    image: null,
+  },
+  {
+    id: "carrot",
+    type: "Carrot",
+    variety: null,
+    name: "Carrot",
+    emoji: "🥕",
+    image: null,
+  },
+  {
+    id: "lettuce",
+    type: "Lettuce",
+    variety: null,
+    name: "Lettuce",
+    emoji: "🥬",
+    image: null,
+  },
 ];
 
 const CUSTOM_PLANTS_KEY = "garden_custom_plants_v1";
@@ -30,7 +62,7 @@ export default function PlannerApp() {
   //
   const activeBedId = garden.activeBedId;
 
-// find the active bed object based on activeBedId. 
+  // find the active bed object based on activeBedId.
   const activeBed = useMemo(() => {
     return beds.find((b) => b.id === activeBedId);
   }, [beds, activeBedId]);
@@ -63,7 +95,6 @@ export default function PlannerApp() {
 
   // Handle image file input for custom plants, converting to dataURL for storage.
   function handlePlantImageFile(file) {
-
     // If no file selected, clear the image
     if (!file) {
       setNewPlantImage(null);
@@ -111,24 +142,40 @@ export default function PlannerApp() {
     return normalized;
   }, [customPlants]);
 
-// Get the currently selected plant object based on selectedPlantId
+  // Get the currently selected plant object based on selectedPlantId
   const selectedPlant = useMemo(() => {
     return allPlantsSorted.find((p) => p.id === selectedPlantId);
   }, [allPlantsSorted, selectedPlantId]);
 
-  /* ===== Helpers ===== */
-  // Creates a new empty bed object with default properties. 
-  // This is used when initializing the app for first-time users or when resetting a bed. 
-  function updateActiveBed(patch) {
+  /* ===== Garden state management functions ===== */
+  const [selectedCellKey, setSelectedCellKey] = useState(null);
 
+  /* he current garden day number, calculated based on the garden's start date. */
+  const [selectedGardenDay, setSelectedGardenDay] = useState(1);
+
+  const currentGardenDay = getCurrentGardenDay(garden.gardenStartISO);
+
+  // Creates an array like [1, 2, 3, ..., currentGardenDay]
+  const gardenDayOptions = Array.from(
+    { length: currentGardenDay },
+    (_, i) => i + 1,
+  );
+
+  /* ===== Helpers ===== */
+
+  // Creates a new empty bed object with default properties.
+  // This is used when initializing the app for first-time users or when resetting a bed.
+  function updateActiveBed(patch) {
     // This function updates the active bed's properties (like rows, cols, or placements)
-    //  by merging the provided patch object into the existing bed data. 
-    // It also updates the updatedAt timestamp to reflect the change. 
+    //  by merging the provided patch object into the existing bed data.
+    // It also updates the updatedAt timestamp to reflect the change.
     // The garden state is then updated immutably to trigger a re-render.
     setGarden((prev) => ({
       ...prev,
       beds: prev.beds.map((bed) =>
-        bed.id === prev.activeBedId ? { ...bed, ...patch, updatedAt: Date.now() } : bed
+        bed.id === prev.activeBedId
+          ? { ...bed, ...patch, updatedAt: Date.now() }
+          : bed,
       ),
     }));
   }
@@ -146,17 +193,46 @@ export default function PlannerApp() {
 
         const updatedPlacements = { ...(bed.placements || {}) };
 
-        // If removeMode is active, delete the plant from this cell. 
+        // If removeMode is active, delete the plant from this cell.
         // Otherwise, set the selected plant in this cell.
         if (removeMode) {
           delete updatedPlacements[key];
         } else {
-          updatedPlacements[key] = selectedPlantId;
+          updatedPlacements[key] = {
+            plantId: selectedPlantId,
+            plantedOnGardenDay: currentGardenDay,
+            entriesByGardenDay: {}, // notes/photos stored per garden day
+          };
         }
 
         return { ...bed, placements: updatedPlacements, updatedAt: Date.now() };
       }),
     }));
+  }
+
+  // This function places the currently selected plant in the cell identified by selectedCellKey.
+  function placeSelectedPlant() {
+    if (!selectedCellKey) return;
+
+    const updatedPlacements = { ...(activeBed.placements || {}) }; // create a shallow copy of the current placements to modify
+
+    const currentGardenDay = getCurrentGardenDay(garden.gardenStartISO); // calculate the current garden day number based on the garden's start date
+
+    updatedPlacements[selectedCellKey] = {
+      // set the selected plant in the specified cell with its ID, the current garden day, and an empty logs array for future notes/photos.
+      plantId: selectedPlantId,
+      plantedOnGardenDay: currentGardenDay,
+      entriesByGardenDay: {}, // notes/photos stored per garden day
+    };
+
+    updateActiveBed({ placements: updatedPlacements });
+  }
+
+  function removePlantFromSelectedCell() {
+    if (!selectedCellKey) return;
+    const updatedPlacements = { ...(activeBed.placements || {}) };
+    delete updatedPlacements[selectedCellKey];
+    updateActiveBed({ placements: updatedPlacements });
   }
 
   // This function creates a new bed with a user-provided name and adds it to the garden state.
@@ -189,14 +265,16 @@ export default function PlannerApp() {
 
     //
     const confirmDelete = window.confirm(
-      `Delete "${activeBed?.name ?? "this bed"}"? This cannot be undone.`
+      `Delete "${activeBed?.name ?? "this bed"}"? This cannot be undone.`,
     );
     // If the user does not confirm the deletion, do nothing.
     if (!confirmDelete) return;
 
     // Update the garden state by filtering out the active bed from the beds array.
     setGarden((prev) => {
-      const updatedBeds = prev.beds.filter((bed) => bed.id !== prev.activeBedId);
+      const updatedBeds = prev.beds.filter(
+        (bed) => bed.id !== prev.activeBedId,
+      );
 
       return {
         ...prev,
@@ -221,7 +299,6 @@ export default function PlannerApp() {
       return;
     }
 
-  
     const id = `custom_${Math.random().toString(36).slice(2, 10)}`;
 
     // Create a new plant object with a unique ID, the provided type, variety, emoji, and optional image.
@@ -240,7 +317,6 @@ export default function PlannerApp() {
     setCustomPlants((prev) => [plant, ...prev]);
     setSelectedPlantId(id);
 
-  
     setNewPlantType("");
     setNewPlantVariety("");
     setNewPlantEmoji("🌱");
@@ -253,13 +329,32 @@ export default function PlannerApp() {
   }, [garden, selectedPlantId]);
 
   /* Safety */
+  // If for some reason the activeBedId does not correspond to any bed (e.g. due to data corruption),
+  // we show a loading state instead of crashing.
+  const selectedCell = selectedCellKey
+    ? (activeBed.placements || {})[selectedCellKey]
+    : null;
+
+  // The plant placement object for the currently selected cell (same as selectedCell, just clearer naming)
+  const placement = selectedCell;
+
+  // Plant's CURRENT day (age) based on the garden timeline
+  const currentPlantDay = placement?.plantedOnGardenDay
+    ? Math.max(0, currentGardenDay - placement.plantedOnGardenDay + 1)
+    : null;
+
+  const selectedPlantIdFromCell = selectedCell?.plantId ?? null;
+
+  const selectedPlantFromCell = allPlantsSorted.find(
+    (p) => p.id === selectedPlantIdFromCell,
+  );
   if (!activeBed) return <div>Loading…</div>; //  in case the activeBedId is invalid, we show a loading state instead of crashing.
 
   /* Render the main app */
-  // The main render of the app consists of two sections: a control panel with inputs and 
-  // buttons for managing the garden, and a grid representing the active garden bed where plants can be placed. 
-  // The control panel includes inputs for adjusting the number of rows and columns, toggling remove mode, switching between beds, 
-  // selecting plants, and adding new beds or custom plants. 
+  // The main render of the app consists of two sections: a control panel with inputs and
+  // buttons for managing the garden, and a grid representing the active garden bed where plants can be placed.
+  // The control panel includes inputs for adjusting the number of rows and columns, toggling remove mode, switching between beds,
+  // selecting plants, and adding new beds or custom plants.
   // The grid displays the layout of the active bed, allowing users to click on cells to place or remove plants based on the current selection and mode.
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -282,7 +377,9 @@ export default function PlannerApp() {
             value={activeBed.cols}
             min={1}
             max={20}
-            onChange={(e) => updateActiveBed({ cols: clampInt(e.target.value, 1, 20) })}
+            onChange={(e) =>
+              updateActiveBed({ cols: clampInt(e.target.value, 1, 20) })
+            }
           />
         </label>
 
@@ -304,8 +401,24 @@ export default function PlannerApp() {
             value={activeBed.rows}
             min={1}
             max={20}
-            onChange={(e) => updateActiveBed({ rows: clampInt(e.target.value, 1, 20) })}
+            onChange={(e) =>
+              updateActiveBed({ rows: clampInt(e.target.value, 1, 20) })
+            }
           />
+        </label>
+        {/* Garden Day Selector */}
+        <label>
+          Garden Day:
+          <select
+            value={selectedGardenDay}
+            onChange={(e) => setSelectedGardenDay(Number(e.target.value))}
+          >
+            {gardenDayOptions.map((day) => (
+              <option key={day} value={day}>
+                Day {day}
+              </option>
+            ))}
+          </select>
         </label>
 
         {/* Bed Switcher */}
@@ -313,7 +426,9 @@ export default function PlannerApp() {
           <span>Garden Bed</span>
           <select
             value={activeBedId}
-            onChange={(e) => setGarden((prev) => ({ ...prev, activeBedId: e.target.value }))}
+            onChange={(e) =>
+              setGarden((prev) => ({ ...prev, activeBedId: e.target.value }))
+            }
           >
             {beds.map((bed) => (
               <option key={bed.id} value={bed.id}>
@@ -326,10 +441,16 @@ export default function PlannerApp() {
         {/* Plant Selection Dropdown (alphabetical, includes custom plants) */}
         <label style={{ display: "grid", gap: 6 }}>
           <span>Selected Plant</span>
-          <select value={selectedPlantId} onChange={(e) => setSelectedPlantId(e.target.value)}>
+          <select
+            value={selectedPlantId}
+            onChange={(e) => setSelectedPlantId(e.target.value)}
+          >
             {allPlantsSorted.map((plant) => (
               <option key={plant.id} value={plant.id}>
-                {plant.emoji} {plant.variety ? `${plant.type} (${plant.variety})` : plant.type}
+                {plant.emoji}{" "}
+                {plant.variety
+                  ? `${plant.type} (${plant.variety})`
+                  : plant.type}
               </option>
             ))}
           </select>
@@ -349,10 +470,14 @@ export default function PlannerApp() {
           Clear Garden
         </button>
 
-        <button onClick={addBed} style={{ padding: 8, borderRadius: 8, border: "1px solid #ccc" }}>
+        {/* add bed  */}
+        <button
+          onClick={addBed}
+          style={{ padding: 8, borderRadius: 8, border: "1px solid #ccc" }}
+        >
           + New Bed
         </button>
-
+        {/* delete bed  */}
         <button
           onClick={deleteBed}
           disabled={beds.length <= 1}
@@ -447,6 +572,70 @@ export default function PlannerApp() {
         </form>
       </div>
 
+      <div
+        style={{
+          padding: 16,
+          border: "1px solid #ddd",
+          borderRadius: 12,
+        }}
+      >
+        <strong>Cell Info</strong>
+
+        {!selectedCellKey ? (
+          <div>Click a cell to see details.</div>
+        ) : !selectedCell ? (
+          <div>This cell is empty.</div>
+        ) : (
+          <div style={{ marginTop: 8 }}>
+            <div>
+              <b>Plant:</b> {selectedPlantFromCell?.type}
+            </div>
+            <div>
+              <b>Variety:</b> {selectedPlantFromCell?.variety ?? "—"}
+            </div>
+            <div>
+              <b>Planted on Garden Day:</b>{" "}
+              {selectedCell.plantedOnGardenDay ?? "—"}
+            </div>
+
+            <div>
+              <b>Plant is currently Day:</b>{" "}
+              {currentPlantDay !== null ? currentPlantDay : "—"}
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+        {/* The "Place Selected Plant" button is enabled when a cell is selected. When clicked, it places the currently selected plant in that cell. */}
+        <button
+          onClick={placeSelectedPlant}
+          disabled={!selectedCellKey}
+          style={{
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            cursor: !selectedCellKey ? "not-allowed" : "pointer",
+            opacity: !selectedCellKey ? 0.6 : 1,
+          }}
+        >
+          Place Selected Plant
+        </button>
+        {/* The "Remove Plant" button is only enabled when a cell is selected and it contains a plant. When clicked, it removes the plant from that cell. */}
+        <button
+          onClick={removePlantFromSelectedCell}
+          disabled={!selectedCellKey || !selectedCell}
+          style={{
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            cursor:
+              !selectedCellKey || !selectedCell ? "not-allowed" : "pointer",
+            opacity: !selectedCellKey || !selectedCell ? 0.6 : 1,
+          }}
+        >
+          Remove Plant
+        </button>
+      </div>
       {/* Garden Bed Grid Section */}
       <div
         style={{
@@ -462,20 +651,32 @@ export default function PlannerApp() {
         {Array.from({ length: activeBed.rows }).map((_, rowIndex) =>
           Array.from({ length: activeBed.cols }).map((_, colIndex) => {
             const key = `${rowIndex},${colIndex}`;
+            const isSelected = key === selectedCellKey;
 
-            const plantId = (activeBed.placements || {})[key];
+            const cell = (activeBed.placements || {})[key];
+            const plantId = cell?.plantId ?? null;
             const plant = allPlantsSorted.find((p) => p.id === plantId);
 
             return (
               <button
                 key={key}
-                onClick={() => toggleCell(rowIndex, colIndex)}
+                onClick={() => {
+                  setSelectedCellKey(key);
+                }}
                 style={{
                   width: 52,
                   height: 52,
                   borderRadius: 10,
-                  border: "1px solid #ccc",
-                  background: plant ? "#f4f4f4" : "white",
+                  border: isSelected
+                    ? "2px solid #000000"
+                    : "1px solid #000000",
+                  background: isSelected
+                    ? "#9bdef3"
+                    : plant
+                      ? "#f4f4f4"
+                      : "white",
+                  transition:
+                    "border-color 0.2s ease, background-color 0.2s ease",
                   cursor: "pointer",
                   fontSize: 22,
                   display: "grid",
@@ -507,7 +708,7 @@ export default function PlannerApp() {
                 )}
               </button>
             );
-          })
+          }),
         )}
       </div>
     </div>
