@@ -33,6 +33,7 @@ export function loadGardenState() {
         activeBedId: firstBed.id,
         beds: [firstBed],
         gardenStartISO: new Date().toISOString(),
+        harvests: [], // initialize empty harvests array for tracking harvested plants
       };
     }
 
