@@ -561,7 +561,7 @@ It updates the placements of the active bed by adding or updating the note in th
       >
         {/* Column Input */}
         <label style={{ display: "grid", gap: 6 }}>
-          <span>Columns</span>
+          <span>Columns (test)</span>
           <input
             type="number"
             value={activeBed.cols}
