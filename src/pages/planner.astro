@@ -1,10 +1,8 @@
 ---
+import Layout from "../layouts/Layout.astro";
 import PlannerApp from "../components/planner/PlannerApp.jsx";
 ---
 
-<main style="padding:24px;max-width:1100px;margin:0 auto;font-family:system-ui;">
-  <h1>Garden Planner</h1>
-  <p style="opacity:.8">MVP: pick a plant, click cells to place.</p>
-
-  <PlannerApp client:only="react" />
-</main>
+<Layout title="Garden Planner">
+  <PlannerApp client:load />
+</Layout>
