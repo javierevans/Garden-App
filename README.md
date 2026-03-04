@@ -1,39 +1,47 @@
-# 🌱 Garden Planner App (In Progress)
+# Smart Garden Planner 🌱
 
-A React-based web application that allows users to design and customize virtual garden layouts.
+A web app that helps users plan and organize their garden beds.  
+Users can create garden beds, place plants on a grid, and visually plan where everything will grow.
 
-This project focuses on dynamic UI rendering, state management, and modular component architecture.
+## Live Demo
+https://evans-smartgarden.vercel.app
 
----
+## Features
 
-## 🚀 Features
+- Create and manage multiple garden beds
+- Custom grid size for each bed
+- Place plants visually in grid cells
+- Highlight selected cells
+- Simple plant library with icons
+- Automatically saves garden state using local storage
 
-- Adjustable grid system (custom rows and columns)
-- Interactive plant selection
-- Real-time UI updates using React state
-- Local storage persistence
-- Component-based structure for scalability
-
----
-
-## 🛠 Tech Stack
+## Tech Stack
 
 - React
 - JavaScript
+- HTML
 - CSS
-- Local Storage API
+- LocalStorage
 
----
+## How It Works
 
-## 📚 What I Learned
+Each garden bed is represented as a grid.  
+Users can select a plant from the plant library and click on a cell to place it.
 
-- Managing complex state with useState and useEffect
-- Structuring scalable component-based applications
-- Designing responsive UI layouts
-- Persisting application state across sessions
+The app saves the garden layout in **localStorage**, so refreshing the page keeps all the beds and plants intact.
 
----
+## Future Improvements
 
-## 🔧 Status
+Planned updates include:
 
-This project is actively being developed and improved.
+- Plant growth tracking
+- Days since planted counter
+- Planting date input
+- Garden activity log
+- Drag and drop plant placement
+- Expanded plant library
+- Mobile UI improvements
+
+## Installation
+
+Clone the repository:
